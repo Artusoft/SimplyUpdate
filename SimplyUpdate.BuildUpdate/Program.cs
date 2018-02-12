@@ -29,7 +29,7 @@ namespace SimplyUpdate.BuildUpdate
 			var optionContainer = app.Option("-c|--container <VALUE>", "The source path", CommandOptionType.SingleValue);
 			var optionAccountName = app.Option("-a|--accountname <VALUE>", "The source path", CommandOptionType.SingleValue);
 			var optionAccountKey = app.Option("-k|--accountkey <VALUE>", "The source path", CommandOptionType.SingleValue);
-
+			
 			app.OnExecute(async () =>
 			{
 				await Execute(optionSource.Value(),
@@ -97,9 +97,10 @@ namespace SimplyUpdate.BuildUpdate
 								));
 
 			var nd = doc.Descendants("Version").FirstOrDefault();
-
+			Int32 previousVer=0;
+			Int32 currentVer=0;
 			if (nd != null)
-				nd.Value = (Convert.ToInt32(nd.Value) + 1).ToString();
+				nd.Value = (currentVer = (previousVer = Convert.ToInt32(nd.Value) + 1)).ToString();
 
 			nd = doc.Descendants("MD5").FirstOrDefault();
 			if (nd == null)
@@ -116,6 +117,8 @@ namespace SimplyUpdate.BuildUpdate
 			await xmlBlob.UploadTextAsync(doc.ToString());
 
 			File.Delete(zipFile);
+
+			Console.WriteLine($"Published version {previousVer} -> {currentVer}");
 		}
 
 		private static Byte[] ComputeHash(String filePath)
