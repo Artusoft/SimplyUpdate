@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <PackageProjectUrl>https://github.com/Artusoft/SimplyUpdate</PackageProjectUrl>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+    <Company>Artusoft</Company>
+    <Authors>Artusoft</Authors>
+    <Product>SimplyUpdate</Product>
+    <PackageTags>Update;Version;Upgrade</PackageTags>
+    <Description>Framework for automatic update</Description>
+  </PropertyGroup>
+
+</Project>
