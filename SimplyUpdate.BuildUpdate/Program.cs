@@ -24,19 +24,30 @@ namespace SimplyUpdate.BuildUpdate
 
 			var optionDestination = app.Option("-d|--destination <PATH>", "The source path", CommandOptionType.SingleValue)
 				.IsRequired();
-			//var optionDestinationType = app.Option("-d|--destinationtype <type>", "The source path", CommandOptionType.SingleValue)
-			//	.Validators.Add()
+			var optionDestinationType = app.Option("-t|--destinationtype <type>", "The destination type [azure, path]", CommandOptionType.SingleValue)
+				.IsRequired();
 			var optionContainer = app.Option("-c|--container <VALUE>", "The source path", CommandOptionType.SingleValue);
 			var optionAccountName = app.Option("-a|--accountname <VALUE>", "The source path", CommandOptionType.SingleValue);
 			var optionAccountKey = app.Option("-k|--accountkey <VALUE>", "The source path", CommandOptionType.SingleValue);
 			
 			app.OnExecute(async () =>
 			{
-				await Execute(optionSource.Value(),
-					optionDestination.Value(),
-					accountName: optionAccountName.Value(),
-					AccountKey: optionAccountKey.Value(),
-					containerName: optionContainer.HasValue()? optionContainer.Value():"public");
+				switch (optionDestinationType.Value())
+				{
+					case "azure":
+						await SendToAzure(optionSource.Value(),
+							optionDestination.Value(),
+							accountName: optionAccountName.Value(),
+							AccountKey: optionAccountKey.Value(),
+							containerName: optionContainer.HasValue()? optionContainer.Value():"public");
+						break;
+
+					case "path":
+						SendToPath(optionSource.Value(),
+							optionDestination.Value()
+							);
+						break;
+				}
 
 				return 0;
 			});
@@ -44,31 +55,9 @@ namespace SimplyUpdate.BuildUpdate
 			return app.Execute(args);
 		}
 
-		public static async Task Execute(String source, String destination, String containerName="", String accountName="",String AccountKey="")
+		public static async Task SendToAzure(String source, String destination, String containerName, String accountName,String AccountKey)
 		{
-			DirectoryInfo pathSource = new DirectoryInfo(source);
-
-			if (!pathSource.Exists) return;
-
-			String pathTemp = Path.Combine(Path.GetTempPath(), "SimplyUpdate");
-			if (!Directory.Exists(pathTemp)) Directory.CreateDirectory(pathTemp);
-
-			String zipFile = Path.Combine(pathTemp, "software.zip");
-			if (File.Exists(zipFile)) File.Delete(zipFile);
-
-			List<String> files = new List<string>();
-
-			files.AddRange(from f in pathSource.GetFiles("*.dll", SearchOption.AllDirectories)
-										 select f.FullName);
-			files.AddRange(from f in pathSource.GetFiles("*.config", SearchOption.AllDirectories)
-										 select f.FullName);
-			files.AddRange(from f in pathSource.GetFiles("*.exe", SearchOption.AllDirectories)
-										 where !f.Name.Contains("vshost")
-										 select f.FullName);
-
-			Console.WriteLine("Zip files.");
-			using (ZipArchive archive = ZipFile.Open(zipFile, ZipArchiveMode.Create))
-				files.ForEach(f => archive.CreateEntryFromFile(f, f.Remove(0, pathSource.FullName.Length+1), CompressionLevel.Optimal));
+			var zipFile = CreateZipFile(source);
 
 			Console.WriteLine("Hashing zip file.");
 			var MD5Hash = ComputeHash(zipFile);
@@ -100,7 +89,7 @@ namespace SimplyUpdate.BuildUpdate
 			Int32 previousVer=0;
 			Int32 currentVer=0;
 			if (nd != null)
-				nd.Value = (currentVer = (previousVer = Convert.ToInt32(nd.Value) + 1)).ToString();
+				nd.Value = (currentVer = (previousVer = Convert.ToInt32(nd.Value)) + 1).ToString();
 
 			nd = doc.Descendants("MD5").FirstOrDefault();
 			if (nd == null)
@@ -117,6 +106,81 @@ namespace SimplyUpdate.BuildUpdate
 			await xmlBlob.UploadTextAsync(doc.ToString());
 
 			File.Delete(zipFile);
+
+			Console.WriteLine($"Published version {previousVer} -> {currentVer}");
+		}
+
+		private static String CreateZipFile(String source)
+		{
+			DirectoryInfo pathSource = new DirectoryInfo(source);
+
+			if (!pathSource.Exists) return String.Empty;
+
+			String pathTemp = Path.Combine(Path.GetTempPath(), "SimplyUpdate");
+			if (!Directory.Exists(pathTemp)) Directory.CreateDirectory(pathTemp);
+
+			String zipFile = Path.Combine(pathTemp, "software.zip");
+			if (File.Exists(zipFile)) File.Delete(zipFile);
+
+			List<String> files = new List<string>();
+
+			files.AddRange(from f in pathSource.GetFiles("*.dll", SearchOption.AllDirectories)
+										 select f.FullName);
+			files.AddRange(from f in pathSource.GetFiles("*.config", SearchOption.AllDirectories)
+										 select f.FullName);
+			files.AddRange(from f in pathSource.GetFiles("*.exe", SearchOption.AllDirectories)
+										 where !f.Name.Contains("vshost")
+										 select f.FullName);
+
+			Console.WriteLine("Zip files.");
+			using (ZipArchive archive = ZipFile.Open(zipFile, ZipArchiveMode.Create))
+				files.ForEach(f => archive.CreateEntryFromFile(f, f.Remove(0, pathSource.FullName.Length + 1), CompressionLevel.Optimal));
+
+			return zipFile;
+		}
+
+		public static void SendToPath(String source, String destination)
+		{
+			var zipFile = CreateZipFile(source);
+
+			Console.WriteLine("Hashing zip file.");
+			var MD5Hash = ComputeHash(zipFile);
+			Console.WriteLine("Copy zip file.");
+
+			File.Copy(zipFile, Path.Combine(destination, "software.zip"), true);
+
+			Console.WriteLine("Update version.");
+			var xmlFile = Path.Combine(destination, "software.xml");
+			XDocument doc;
+			if (File.Exists(xmlFile))
+				doc = XDocument.Load(xmlFile);
+			else
+				doc = new XDocument(
+					new XElement("Liveupdate",
+					new XElement("Version", 0)
+					));
+
+			var nd = doc.Descendants("Version").FirstOrDefault();
+			Int32 previousVer = 0;
+			Int32 currentVer = 0;
+			if (nd != null)
+				nd.Value = (currentVer = (previousVer = Convert.ToInt32(nd.Value)) + 1).ToString();
+
+			nd = doc.Descendants("MD5").FirstOrDefault();
+			if (nd == null)
+				doc.Element("Liveupdate").Add(new XElement("MD5", Convert.ToBase64String(MD5Hash)));
+			else
+				nd.Value = Convert.ToBase64String(MD5Hash);
+
+			nd = doc.Descendants("FileLenght").FirstOrDefault();
+			if (nd == null)
+				doc.Element("Liveupdate").Add(new XElement("FileLenght", (new System.IO.FileInfo(zipFile)).Length));
+			else
+				nd.Value = (new System.IO.FileInfo(zipFile)).Length.ToString();
+
+			doc.Save(xmlFile);
+
+			System.IO.File.Delete(zipFile);
 
 			Console.WriteLine($"Published version {previousVer} -> {currentVer}");
 		}

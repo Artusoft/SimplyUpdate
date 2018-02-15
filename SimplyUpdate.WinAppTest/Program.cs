@@ -14,9 +14,6 @@ namespace SimplyUpdate.WinAppTest
 		[STAThread]
 		static void Main()
 		{
-			
-			
-
 			Application.EnableVisualStyles();
 			Application.SetCompatibleTextRenderingDefault(false);
 			using (var frm = new FormMain())
