@@ -10,7 +10,7 @@
     <Product>SimplyUpdate</Product>
     <PackageTags>Update;Version;Upgrade</PackageTags>
     <Description>Framework for automatic update</Description>
-    <Version>1.0.1</Version>
+    <Version>1.0.2</Version>
     <FileVersion>1.0.1</FileVersion>
     <AssemblyVersion>1.0.1</AssemblyVersion>
     <PackageLicenseUrl>https://raw.githubusercontent.com/Artusoft/SimplyUpdate/master/LICENSE</PackageLicenseUrl>
