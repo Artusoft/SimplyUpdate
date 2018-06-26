@@ -14,11 +14,12 @@ namespace SimplyUpdate.Updater
 	{
 		private String RemoteRepository = String.Empty;
 		private String LocalPath = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location);
-		private Func<Boolean> WhenUpdateAvailableAction = () => true;
+		private Func<UpdateAvailableInfo,Boolean> WhenUpdateAvailableAction = (e) => true;
 		private IProgress<ProgressValue> UpdateProgress = null;
 		private Action WhenUpdateCompletedAction = null;
 		private Action<Exception> WhenErrorAction = null;
 		private CancellationToken cancellationToken = CancellationToken.None;
+		private Action<LogLevel, String> LogAction = null;
 
 		public UpdaterClient Configure(String remoteRepository)
 		{
@@ -26,7 +27,7 @@ namespace SimplyUpdate.Updater
 			return this;
 		}
 
-		public UpdaterClient WhenUpdateAvailable(Func<Boolean> action)
+		public UpdaterClient WhenUpdateAvailable(Func<UpdateAvailableInfo,Boolean> action)
 		{
 			WhenUpdateAvailableAction = action;
 			return this;
@@ -41,6 +42,12 @@ namespace SimplyUpdate.Updater
 		public UpdaterClient WithCancellationToken(CancellationToken ct)
 		{
 			cancellationToken = ct;
+			return this;
+		}
+
+		public UpdaterClient WithLogger(Action<LogLevel, String> action)
+		{
+			LogAction = action;
 			return this;
 		}
 
@@ -61,47 +68,53 @@ namespace SimplyUpdate.Updater
 		public async Task RunAsync()
 		{
 			PurgeOldFile();
+			LogAction?.Invoke(LogLevel.Info, $"Search new version ...");
+			var updateInfo = await CheckUpdate();
+			LogAction?.Invoke(LogLevel.Debug, $"Remote version: {updateInfo.RemoteVersion} - Local version: {updateInfo.LocalVersion}");
 
-			if (await CheckUpdate() && WhenUpdateAvailableAction())
+			if (updateInfo.UpdateAvailable)
 			{
-				try
-				{
-					String zipFile = Path.GetTempFileName();
-					var uriZip = new Uri(RemoteRepository + "software.zip");
-
-					if (await DownloadFile(uriZip, zipFile))
+				LogAction?.Invoke(LogLevel.Info, $"New version {updateInfo.RemoteVersion} found");
+				if (WhenUpdateAvailableAction(updateInfo))
+					try
 					{
-						UnzipFile(zipFile);
-						var uriXml = new Uri(RemoteRepository + "software.xml");
-						using (WebClient clt = new WebClient())
-							clt.DownloadFile(uriXml, Path.Combine(LocalPath, "software.xml"));
+						String zipFile = Path.GetTempFileName();
+						var uriZip = new Uri(RemoteRepository + "software.zip");
 
-						File.Delete(zipFile);
-						WhenUpdateCompletedAction?.Invoke();
+						if (await DownloadFile(uriZip, zipFile))
+						{
+							UnzipFile(zipFile);
+							var uriXml = new Uri(RemoteRepository + "software.xml");
+							using (WebClient clt = new WebClient())
+								clt.DownloadFile(uriXml, Path.Combine(LocalPath, "software.xml"));
+
+							File.Delete(zipFile);
+							WhenUpdateCompletedAction?.Invoke();
+						}
 					}
-				}
-				catch(Exception ex)
-				{
-					WhenErrorAction?.Invoke(ex);
-					// TODO:Send to logger 
-				}
+					catch (Exception ex)
+					{
+						WhenErrorAction?.Invoke(ex);
+						LogAction?.Invoke(LogLevel.Error, ex.Message);
+					}
 			}
 		}
 
 		private void PurgeOldFile()
 		{
+			LogAction?.Invoke(LogLevel.Debug, $"Purge old files ...");
 			foreach (var f in Directory.GetFiles(LocalPath, "*.SimplyUpdateOldFile", SearchOption.AllDirectories))
 				try
 				{
 					File.Delete(f);
 				}
-				catch
+				catch(Exception ex)
 				{
-					// TODO:Send to logger 
+					LogAction?.Invoke(LogLevel.Error, ex.Message);
 				}
 		}
 
-		private Task<Boolean> CheckUpdate()
+		private Task<UpdateAvailableInfo> CheckUpdate()
 		=> Task.Factory.StartNew(() =>
 			{
 				Int32 localVersion = 0;
@@ -109,7 +122,6 @@ namespace SimplyUpdate.Updater
 
 				try
 				{
-					Console.WriteLine("Controllo disponibilità aggiornamento ...");
 					String uriXml = RemoteRepository + "software.xml";
 					XDocument doc = XDocument.Load(uriXml);
 					remoteVersion = Convert.ToInt32((from n in doc.Descendants("Version")
@@ -130,7 +142,7 @@ namespace SimplyUpdate.Updater
 				}
 				catch { }
 
-				return remoteVersion > localVersion;
+				return new UpdateAvailableInfo(localVersion, remoteVersion);
 			});
 
 		private void UnzipFile(string zipFile)
@@ -177,7 +189,7 @@ namespace SimplyUpdate.Updater
 			}
 			catch(Exception ex)
 			{
-				// TODO:Send to logger 
+				LogAction?.Invoke(LogLevel.Error, ex.Message);
 				WhenErrorAction?.Invoke(ex);
 				return false;
 			}
