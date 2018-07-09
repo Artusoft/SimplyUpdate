@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
@@ -11,8 +11,8 @@
     <PackageTags>Update;Version;Upgrade</PackageTags>
     <Description>Framework for automatic update</Description>
     <Version>1.0.2</Version>
-    <FileVersion>1.0.1</FileVersion>
-    <AssemblyVersion>1.0.1</AssemblyVersion>
+    <FileVersion>1.0.2</FileVersion>
+    <AssemblyVersion>1.0.2</AssemblyVersion>
     <PackageLicenseUrl>https://raw.githubusercontent.com/Artusoft/SimplyUpdate/master/LICENSE</PackageLicenseUrl>
     <RepositoryUrl>https://github.com/Artusoft/SimplyUpdate</RepositoryUrl>
   </PropertyGroup>

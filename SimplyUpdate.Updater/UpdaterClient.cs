@@ -13,7 +13,7 @@ namespace SimplyUpdate.Updater
 	public class UpdaterClient
 	{
 		private String RemoteRepository = String.Empty;
-		private String LocalPath = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location);
+		private static String LocalPath = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location);
 		private Func<UpdateAvailableInfo,Boolean> WhenUpdateAvailableAction = (e) => true;
 		private IProgress<ProgressValue> UpdateProgress = null;
 		private Action WhenUpdateCompletedAction = null;
@@ -117,7 +117,6 @@ namespace SimplyUpdate.Updater
 		private Task<UpdateAvailableInfo> CheckUpdate()
 		=> Task.Factory.StartNew(() =>
 			{
-				Int32 localVersion = 0;
 				Int32 remoteVersion = 0;
 
 				try
@@ -129,21 +128,28 @@ namespace SimplyUpdate.Updater
 				}
 				catch { }
 
-				String localXml = System.IO.Path.Combine(LocalPath, "software.xml");
-				try
-				{
-
-					if (System.IO.File.Exists(localXml))
-					{
-						XDocument doc = XDocument.Load(localXml);
-						localVersion = Convert.ToInt32((from n in doc.Descendants("Version")
-																						select n.Value).FirstOrDefault());
-					}
-				}
-				catch { }
+				Int32 localVersion = GetLocalVersion();
 
 				return new UpdateAvailableInfo(localVersion, remoteVersion);
 			});
+
+		public static Int32 GetLocalVersion()
+		{
+			Int32 retVal = 0;
+			String localXml = System.IO.Path.Combine(LocalPath, "software.xml");
+			try
+			{
+
+				if (System.IO.File.Exists(localXml))
+				{
+					XDocument doc = XDocument.Load(localXml);
+					retVal = Convert.ToInt32((from n in doc.Descendants("Version")
+																					select n.Value).FirstOrDefault());
+				}
+			}
+			catch { }
+			return retVal;
+		}
 
 		private void UnzipFile(string zipFile)
 		{
