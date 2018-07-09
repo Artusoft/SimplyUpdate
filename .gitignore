@@ -260,3 +260,4 @@ paket-files/
 __pycache__/
 *.pyc
 /SimplyUpdate.BuildUpdate/Properties/launchSettings.json
+/SimplyUpdate.Updater/Properties/PublishProfiles/FolderProfile.pubxml
