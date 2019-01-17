@@ -14,6 +14,7 @@ namespace SimplyUpdate.Updater
 	{
 		private String RemoteRepository = String.Empty;
 		private static String LocalPath = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location);
+		private Func<UpdateAvailableInfo, Boolean> CheckUpdateAvailableAction = (info) => info.RemoteVersion > info.LocalVersion || info.RemoteFileVersion > info.LocalFileVersion;
 		private Func<UpdateAvailableInfo,Boolean> WhenUpdateAvailableAction = (e) => true;
 		private IProgress<ProgressValue> UpdateProgress = null;
 		private Action WhenUpdateCompletedAction = null;
@@ -36,6 +37,12 @@ namespace SimplyUpdate.Updater
 		public UpdaterClient WithUpdateProgress(IProgress<ProgressValue> progress)
 		{
 			UpdateProgress = progress;
+			return this;
+		}
+
+		public UpdaterClient WithCheckUpdateAvailable(Func<UpdateAvailableInfo, Boolean> function)
+		{
+			CheckUpdateAvailableAction = function;
 			return this;
 		}
 
@@ -72,7 +79,7 @@ namespace SimplyUpdate.Updater
 			var updateInfo = await CheckUpdate();
 			LogAction?.Invoke(LogLevel.Debug, $"Remote version: {updateInfo.RemoteVersion} - Local version: {updateInfo.LocalVersion}");
 
-			if (updateInfo.UpdateAvailable)
+			if (CheckUpdateAvailableAction?.Invoke(updateInfo) ?? false)
 			{
 				LogAction?.Invoke(LogLevel.Info, $"New version {updateInfo.RemoteVersion} found");
 				if (WhenUpdateAvailableAction(updateInfo))

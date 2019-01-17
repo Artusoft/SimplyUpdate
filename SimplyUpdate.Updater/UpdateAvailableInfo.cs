@@ -18,10 +18,5 @@ namespace SimplyUpdate.Updater
 		public Int32 RemoteVersion { get; }
 		public Version LocalFileVersion { get; }
 		public Version RemoteFileVersion { get; }
-
-		public Boolean UpdateAvailable
-		{
-			get => RemoteVersion > LocalVersion || RemoteFileVersion > LocalFileVersion;
-		}
 	}
 }
