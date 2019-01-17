@@ -114,42 +114,46 @@ namespace SimplyUpdate.Updater
 				}
 		}
 
-		private Task<UpdateAvailableInfo> CheckUpdate()
-		=> Task.Factory.StartNew(() =>
-			{
-				Int32 remoteVersion = 0;
+		private async Task<UpdateAvailableInfo> CheckUpdate()
+		{
+			var remoteTask = GetVersionInfoAsync(RemoteRepository + "software.xml");
+			var localTask = GetVersionInfoAsync(Path.Combine(LocalPath, "software.xml"));
 
+			await Task.WhenAll(remoteTask, localTask);
+
+			return new UpdateAvailableInfo(
+				localTask.Result.Version,
+				remoteTask.Result.Version,
+				localTask.Result.FileVersion,
+				remoteTask.Result.FileVersion);
+		}
+
+		public static Task<(Int32 Version, Version FileVersion)> GetVersionInfoAsync(String path)
+			=> Task.Factory.StartNew(() =>
+			{
+				Int32 version = 0;
+				Version fileVersion = new Version();
+
+				String localXml = Path.Combine(LocalPath, "software.xml");
 				try
 				{
-					String uriXml = RemoteRepository + "software.xml";
-					XDocument doc = XDocument.Load(uriXml);
-					remoteVersion = Convert.ToInt32((from n in doc.Descendants("Version")
-																					 select n.Value).FirstOrDefault());
+					if (File.Exists(localXml))
+					{
+						XDocument doc = XDocument.Load(localXml);
+						version = Convert.ToInt32((from n in doc.Descendants("Version")
+																			 select n.Value).FirstOrDefault());
+
+						var fileVersionString = (from n in doc.Descendants("FileVersion")
+																		 select n.Value).FirstOrDefault();
+
+						Version.TryParse(fileVersionString, out fileVersion);
+					}
 				}
 				catch { }
 
-				Int32 localVersion = GetLocalVersion();
-
-				return new UpdateAvailableInfo(localVersion, remoteVersion);
-			});
-
-		public static Int32 GetLocalVersion()
-		{
-			Int32 retVal = 0;
-			String localXml = System.IO.Path.Combine(LocalPath, "software.xml");
-			try
-			{
-
-				if (System.IO.File.Exists(localXml))
-				{
-					XDocument doc = XDocument.Load(localXml);
-					retVal = Convert.ToInt32((from n in doc.Descendants("Version")
-																					select n.Value).FirstOrDefault());
-				}
+				return (version, fileVersion);
 			}
-			catch { }
-			return retVal;
-		}
+		);
 
 		private void UnzipFile(string zipFile)
 		{
