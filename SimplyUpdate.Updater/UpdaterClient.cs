@@ -132,14 +132,11 @@ namespace SimplyUpdate.Updater
 			=> Task.Factory.StartNew(() =>
 			{
 				Int32 version = 0;
-				Version fileVersion = new Version();
+				Version fileVersion = null;
 
-				String localXml = Path.Combine(LocalPath, "software.xml");
 				try
 				{
-					if (File.Exists(localXml))
-					{
-						XDocument doc = XDocument.Load(localXml);
+						XDocument doc = XDocument.Load(path);
 						version = Convert.ToInt32((from n in doc.Descendants("Version")
 																			 select n.Value).FirstOrDefault());
 
@@ -147,11 +144,10 @@ namespace SimplyUpdate.Updater
 																		 select n.Value).FirstOrDefault();
 
 						Version.TryParse(fileVersionString, out fileVersion);
-					}
 				}
 				catch { }
 
-				return (version, fileVersion);
+				return (version, fileVersion ?? new Version());
 			}
 		);
 
